@@ -24,6 +24,10 @@
             {
                 color: blue;
             }
+            #loginBtn, #logoutBtn, #registerBtn, #clearBtn, #treasure
+            {
+                display: none;
+            }
         </style>
     </head>
     
@@ -31,17 +35,20 @@
         <div class="container">
             
            <div class="jumbotron jumbotron-fluid">
-  <div class="container">
+  <div class="container" >
     <h1 class="display-4">Treasure Hunt</h1>
     <p class="lead">This is the best game ever.</p>
   </div>
 </div>
 <ul class="nav justify-content-start border p-2 bg-dark text-white">
                 <li class="nav-item">
-                    <a href="#" id='loginBtn' class='nav-link'>Login</a>
+                    <a href="#" id='loginBtn' class='nav-link' >Login</a>
                 </li>
                 <li class="nav-item">
                     <a href="#" id='registerBtn' class='nav-link'>Register</a>
+                </li>
+                <li class="nav-item">
+                    <a href="#" id='clearBtn' class='nav-link'>Clear Low Score</a>
                 </li>
                 <li class="nav-item">
                     <a href="#" id='logoutBtn' class='nav-link'>Logout</a>
@@ -55,10 +62,12 @@
 </div>
 
             <!--boxes-->
+            <div id="treasure">
             <div id='boxes' class='row'>
             </div>
             
-            <p>Guesses: <span id='guesses'>0</span></p>
+            <p id="guess"></p>
+            <p id="low"></p>
         </div>
         
         <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
@@ -146,41 +155,91 @@
         {
             // model ....
             let model = {};
+            let treasure_model = {};
 
             function initializeModel()
             {
+                
+                sendRequest("whoIsLoggedIn", function()
+                {
+                    if (model.error == undefined)
+                        sendRequest("LowGuess"); 
+                });
+                
                 let boxCount = 12;
-                model.guesses = 0;
-                model.boxes = [];
+                treasure_model.guesses = 0;
+                treasure_model.boxes = [];
                 let prize = Math.floor(Math.random() * boxCount);
                 for (var i = 0; i < boxCount; i++) 
                 {
-                  model.boxes.push({flipped: false, prize: false});
+                  treasure_model.boxes.push({flipped: false, prize: false});
                 }
-                model.boxes[prize].prize = true;
-                model.gameOver = false;
+                treasure_model.boxes[prize].prize = true;
+                treasure_model.gameOver = false;
+                
             }
 
             // view...
             function updateView()
             {
+                if (model.result == undefined)
+                {
+                    $("#msg").text(model.error);
+                    
+                    $("#logoutBtn").hide();
+                    $("#loginBtn").show();
+                    $("#registerBtn").show();
+                    $("#clearBtn").hide();
+                    $("#treasure").hide();
+                }
+                else
+                {
+                    $("#logoutBtn").show();
+                    $("#clearBtn").show();
+                    $("#loginBtn").hide();
+                    $("#registerBtn").hide();
+                    $("#treasure").show();
+                    
+                    if (model.result.email == undefined)
+                    {
+                        
+                    }
+                    else
+                    {
+                        $("#msg").text("Hello " + model.result.email);
+                    }
+                }
+                    
                 $('#boxes').empty();                
-                for (var i in model.boxes) 
+                for (var i in treasure_model.boxes) 
                 {
                     let item = $("<div class='col-sm-6 box'></div>");
-                    if (model.boxes[i].flipped && model.boxes[i].prize)
+                    if (treasure_model.boxes[i].flipped && treasure_model.boxes[i].prize)
                     {
                       item.addClass("prize");
                     }
-                    else if (model.boxes[i].flipped && !model.boxes[i].prize)
+                    else if (treasure_model.boxes[i].flipped && !treasure_model.boxes[i].prize)
                     {
                       item.addClass("flipped");
                     }
                     item.attr("id", i);
                     $('#boxes').append(item);
+                    
+                    $('#guess').empty();
+                    $('#guess').append("Guesses: ");
+                    $('#guess').append(treasure_model.guesses);
+                
+                    
+                    $('#low').empty();
+                    $('#low').append("Lowest Guess: ");
+                    if(model.result.low != 0)
+                        $('#low').append(model.result.low);
+                    else
+                        $('#low').append(treasure_model.guesses);
                 }
-                $("#guesses").text(model.guesses);
-            }            
+            }
+                
+            
             
             // controller ...
             $(document).on("click",".box",function() 
@@ -191,15 +250,16 @@
                 }
                 
                 let i = $(this).attr("id");
-                if (!model.boxes[i].flipped)
+                if (!treasure_model.boxes[i].flipped)
                 {
-                  model.guesses = model.guesses+1;
-                  model.boxes[i].flipped = true;
-                  if(model.boxes[i].prize)
+                  treasure_model.guesses = treasure_model.guesses+1;
+                  treasure_model.boxes[i].flipped = true;
+                  if(treasure_model.boxes[i].prize)
                   {
-                    model.gameOver = true;
+                    treasure_model.gameOver = true;
                     updateView();
                     $('#confirm').modal('show');
+                     
                   }
                   else
                   {
@@ -207,6 +267,24 @@
                   }
                 }
             });
+            
+            function sendRequest(url, callback)
+            {
+                var jqxhr = $.get(url);
+                jqxhr.done(function(json) 
+                {
+                    model = json;
+                    updateView();
+                    if (callback !== undefined)
+                        callback();
+                })
+                jqxhr.fail(function(json) 
+                {
+                    let error = JSON.stringify(json);
+                    model.error = error;
+                    updateView();
+                })
+            }
 
             $('#loginBtn').click(function() 
             {
@@ -220,6 +298,41 @@
                 $('#registerDlg').modal('show');
             });
             
+            $('#confirmLoginBtn').click(function() 
+            {
+                let email = $('#email').val().trim();
+                let password = $('#password').val().trim();
+                
+                sendRequest("login?email="+email+"&password="+password, function ()
+                {
+                    if (model.error == undefined)
+                        sendRequest("getScore",function() {
+                            
+                        });    
+                });
+                $('#loginDlg').modal('hide');
+            });
+            $('#confirmRegisterBtn').click(function() 
+            {
+                let email = $('#regEmail').val().trim();
+                let password = $('#regPassword').val().trim();
+                sendRequest("register?email="+email+"&password="+password, function () 
+                { 
+                    if (model.error == undefined)
+                        sendRequest("getScore");
+                });
+                
+                $('#registerDlg').modal('hide');
+            });
+            $('#logoutBtn').click(function() 
+            {
+                sendRequest("logout", function() 
+                {
+                    if (model.error != undefined)
+                        $("#songs").empty();
+                });
+            });
+            
             $('#yes').click(function() 
             {
                 $('#confirm').modal('hide');
@@ -231,6 +344,7 @@
             initializeModel();
             updateView();
         });
+        
         
         </script>
     </body>

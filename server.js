@@ -15,7 +15,7 @@ const conInfo =
     host: process.env.IP,
     user: process.env.C9_USER,
     password: "",
-    database: "SONGDB"
+    database: "USERDB"
 };
 
 var session = require('express-session'); 
@@ -29,10 +29,8 @@ app.all('/whoIsLoggedIn', whoIsLoggedIn);
 app.all('/register', register);
 app.all('/login', login);
 app.all('/logout', logout);
-app.all('/listSongs', listSongs);
-app.all('/addSong', addSong);
-app.all('/removeSong', removeSong);
-app.all('/clearSongs', clearSongs);
+app.all('/LowGuess', LowGuess);
+app.all('/UpdateLow', UpdateLow);
 
 
 app.listen(process.env.PORT,  process.env.IP, startHandler())
@@ -40,144 +38,6 @@ app.listen(process.env.PORT,  process.env.IP, startHandler())
 function startHandler()
 {
   console.log('Server listening on port ' + process.env.PORT)
-}
-
-function listSongs(req, res)
-{
-  if (req.session.user == undefined)
-  {
-    writeResult(req, res, {'error' : "Please login."});
-    return;
-  }
-
-  var con = mysql.createConnection(conInfo);
-  con.connect(function(err) 
-  {
-    if (err) 
-      writeResult(req, res, {'error' : err});
-    else
-    {
-      con.query("SELECT * FROM SONG WHERE USER_ID = ? ORDER BY SONG_NAME", [req.session.user.result.id], function (err, result, fields) 
-      {
-        if (err) 
-          writeResult(req, res, {'error' : err});
-        else
-          writeResult(req, res, {'result' : result});
-      });
-    }
-  });
-}
-
-function addSong(req, res)
-{
-  if (req.session.user == undefined)
-  {
-    writeResult(req, res, {'error' : "Please login."});
-    return;
-  }
-  
-  if (req.query.song == undefined)
-    writeResult(req, res, {'error' : "add requires you to enter a song"});
-  else
-  {
-    var con = mysql.createConnection(conInfo);
-    con.connect(function(err) 
-    {
-      if (err) 
-        writeResult(req, res, {'error' : err});
-      else
-      {
-        con.query('INSERT INTO SONG (SONG_NAME, USER_ID) VALUES (?, ?)', [req.query.song, req.session.user.result.id], function (err, result, fields) 
-        {
-          if (err) 
-            writeResult(req, res, {'error' : err});
-          else
-          {
-            con.query("SELECT * FROM SONG WHERE USER_ID = ? ORDER BY SONG_NAME", [req.session.user.result.id], function (err, result, fields) 
-            {
-              if (err) 
-                writeResult(req, res, {'error' : err});
-              else
-                writeResult(req, res, {'result' : result});
-            });
-          }
-        });
-      }
-    });
-  }
-}
-
-function removeSong(req, res)
-{
-  if (req.session.user == undefined)
-  {
-    writeResult(req, res, {'error' : "Please login."});
-    return;
-  }
-
-  if (req.query.song == undefined)
-    writeResult(req, res, {'error' : "add requires you to enter a song"});
-  else
-  {
-    var con = mysql.createConnection(conInfo);
-    con.connect(function(err) 
-    {
-      if (err) 
-        writeResult(req, res, {'error' : err});
-      else
-      {
-        con.query('DELETE FROM SONG WHERE SONG_NAME = ? AND USER_ID = ?', [req.query.song, req.session.user.result.id], function (err, result, fields) 
-        {
-          if (err) 
-            writeResult(req, res, {'error' : err});
-          else
-          {
-            con.query("SELECT * FROM SONG WHERE USER_ID = ? ORDER BY SONG_NAME", [req.session.user.result.id], function (err, result, fields) 
-            {
-              if (err) 
-                writeResult(req, res, {'error' : err});
-              else
-                writeResult(req, res, {'result' : result});
-            });
-          }
-        });
-      }
-    });
-  }
-}
-
-function clearSongs(req, res)
-{
-  if (req.session.user == undefined)
-  {
-    writeResult(req, res, {'error' : "Please login."});
-    return;
-  }
-  
-  var con = mysql.createConnection(conInfo);
-  con.connect(function(err) 
-  {
-    if (err) 
-      writeResult(req, res, {'error' : err});
-    else
-    {
-      con.query('DELETE FROM SONG WHERE USER_ID = ?', [req.session.user.result.id], function (err, result, fields) 
-      {
-        if (err) 
-          writeResult(req, res, {'error' : err});
-        else
-        {
-          con.query("SELECT * FROM SONG WHERE USER_ID = ? ORDER BY SONG_NAME", [req.session.user.result.id], function (err, result, fields) 
-          {
-            if (err) 
-              writeResult(req, res, {'error' : err});
-            else
-              writeResult(req, res, {'result' : result});
-          });
-        }
-      });
-    }
-  });
 }
 
 function whoIsLoggedIn(req, res)
@@ -320,6 +180,69 @@ function validatePassword(pass)
     return re.test(pass);
   }
 }
+
+function UpdateLow(req, res)
+{
+   if (req.session.user == undefined)
+  {
+    writeResult(req, res, {'error' : "Please login."});
+    return;
+  }
+  else
+  {
+    var con = mysql.createConnection(conInfo);
+    con.connect(function(err) 
+    {
+      if (err) 
+        writeResult(req, res, {'error' : err});
+      else
+      {
+        if(req.query.low != undefined)
+          con.query('UPDATE USER SET LOW_SCORE = ? WHERE USER_ID = ?', [req.query.low, req.session.user.result.id], function (err, result, fields) 
+          {
+            if (err) 
+              writeResult(req, res, {'error' : err});
+            else
+            {
+              req.session.user.result.low = req.query.low;
+              writeResult(req, res, req.session.user.result);
+            }
+          });
+      }
+    });
+  }
+  
+}
+
+function LowGuess(req, res)
+{
+  if (req.session.user == undefined)
+  {
+    writeResult(req, res, {'error' : "Please login."});
+    return;
+  }
+
+  var con = mysql.createConnection(conInfo);
+  con.connect(function(err) 
+  {
+    if (err) 
+      writeResult(req, res, {'error' : err});
+    else
+    {
+      con.query("SELECT * FROM USER WHERE USER_ID = ?", [req.session.user.result.id], function (err, result, fields) 
+      {
+        if (err) 
+          writeResult(req, res, {'error' : err});
+        else
+        {
+          req.session.user = {'result' : {'id': result[0].USER_ID, 'email': result[0].USER_EMAIL, 'low': result[0].LOW_SCORE}};
+          writeResult(req, res, req.session.user);
+        }
+      });
+    }
+  });
+}
+
 
 function serveIndex(req, res)
 {
